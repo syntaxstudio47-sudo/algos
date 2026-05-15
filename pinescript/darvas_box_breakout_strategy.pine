@@ -1,0 +1,17 @@
+//@version=5
+strategy("Darvas Box Breakout", overlay=true, pyramiding=0)
+len = input.int(25, "Box Length")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.4, "SL ATR Mult")
+rr = input.float(2.5, "RR")
+boxHigh = ta.highest(high, len)[1]
+boxLow = ta.lowest(low, len)[1]
+atr = ta.atr(atrLen)
+if ta.crossover(close, boxHigh)
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if ta.crossunder(close, boxLow)
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)
+plot(boxHigh, color=color.new(color.purple, 0))
+plot(boxLow, color=color.new(color.purple, 0))

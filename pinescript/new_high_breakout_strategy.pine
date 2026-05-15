@@ -1,0 +1,13 @@
+//@version=5
+strategy("New High Breakout", overlay=true, pyramiding=0)
+len = input.int(52, "High Lookback")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.5, "SL ATR Mult")
+rr = input.float(3.0, "RR")
+atr = ta.atr(atrLen)
+nh = ta.highest(high, len)[1]
+longCond = ta.crossover(close, nh)
+if longCond
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+plot(nh, color=color.new(color.green, 0))

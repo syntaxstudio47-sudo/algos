@@ -1,0 +1,19 @@
+//@version=5
+strategy("Channel Breakout Strategy", overlay=true, pyramiding=0)
+len = input.int(20, "Channel Length")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.4, "SL ATR Mult")
+rr = input.float(2.5, "RR")
+hi = ta.highest(high, len)[1]
+lo = ta.lowest(low, len)[1]
+atr = ta.atr(atrLen)
+longCond = ta.crossover(close, hi)
+shortCond = ta.crossunder(close, lo)
+if longCond
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if shortCond
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)
+plot(hi, "High", color=color.new(color.teal, 0))
+plot(lo, "Low", color=color.new(color.teal, 0))

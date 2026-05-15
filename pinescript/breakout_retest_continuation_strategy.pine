@@ -1,0 +1,17 @@
+//@version=5
+strategy("Breakout Retest Continuation", overlay=true, pyramiding=0)
+len = input.int(25, "Structure Length")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.3, "SL ATR Mult")
+rr = input.float(2.5, "RR")
+atr = ta.atr(atrLen)
+hi = ta.highest(high, len)[1]
+lo = ta.lowest(low, len)[1]
+longCond = close > hi and low <= hi and close > open
+shortCond = close < lo and high >= lo and close < open
+if longCond
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if shortCond
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)

@@ -1,0 +1,20 @@
+//@version=5
+strategy("Trend Follower Breakout", overlay=true, pyramiding=0)
+len = input.int(50, "Breakout Length")
+maLen = input.int(200, "Trend MA")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.4, "SL ATR Mult")
+rr = input.float(2.8, "RR")
+trend = ta.ema(close, maLen)
+hi = ta.highest(high, len)[1]
+lo = ta.lowest(low, len)[1]
+atr = ta.atr(atrLen)
+longCond = close > trend and ta.crossover(close, hi)
+shortCond = close < trend and ta.crossunder(close, lo)
+if longCond
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if shortCond
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)
+plot(trend, color=color.new(color.orange, 0))

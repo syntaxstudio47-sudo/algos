@@ -1,0 +1,16 @@
+//@version=5
+strategy("Ascending Triangle Breakout", overlay=true, pyramiding=0)
+len = input.int(40, "Lookback")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.4, "SL ATR Mult")
+rr = input.float(2.7, "RR")
+hi = ta.highest(high, len)[1]
+lo = ta.lowest(low, len)[1]
+atr = ta.atr(atrLen)
+flatRes = math.abs(ta.sma(high, len) - ta.highest(high, len)) < atr * 0.3
+risingLows = ta.linreg(low, len, 0) > ta.linreg(low, len, 1)
+longCond = flatRes and risingLows and ta.crossover(close, hi)
+if longCond
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+plot(hi, color=color.new(color.green, 0))

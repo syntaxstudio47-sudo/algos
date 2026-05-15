@@ -1,0 +1,32 @@
+//@version=5
+strategy("Opening Range Breakout", overlay=true, pyramiding=0)
+startH = input.int(9, "Start Hour")
+startM = input.int(15, "Start Minute")
+orbBars = input.int(15, "ORB Minutes")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.3, "SL ATR Mult")
+rr = input.float(2.5, "RR")
+atr = ta.atr(atrLen)
+newDay = ta.change(time("D"))
+var float orHigh = na
+var float orLow = na
+var int orCount = 0
+sess = (hour == startH and minute >= startM) or (hour == startH and minute < startM + orbBars)
+if newDay
+    orHigh := na
+    orLow := na
+    orCount := 0
+if sess
+    orHigh := na(orHigh) ? high : math.max(orHigh, high)
+    orLow := na(orLow) ? low : math.min(orLow, low)
+    orCount += 1
+longCond = not na(orHigh) and orCount >= orbBars and ta.crossover(close, orHigh)
+shortCond = not na(orLow) and orCount >= orbBars and ta.crossunder(close, orLow)
+if longCond
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if shortCond
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)
+plot(orHigh, color=color.new(color.green, 0))
+plot(orLow, color=color.new(color.red, 0))

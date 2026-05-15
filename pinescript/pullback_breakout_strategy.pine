@@ -1,0 +1,20 @@
+//@version=5
+strategy("Pullback Breakout", overlay=true, pyramiding=0)
+trendLen = input.int(100, "Trend EMA")
+pullLen = input.int(10, "Pullback Bars")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.3, "SL ATR Mult")
+rr = input.float(2.7, "RR")
+ema = ta.ema(close, trendLen)
+pullHigh = ta.highest(high, pullLen)[1]
+pullLow = ta.lowest(low, pullLen)[1]
+atr = ta.atr(atrLen)
+longCond = close > ema and ta.crossover(close, pullHigh)
+shortCond = close < ema and ta.crossunder(close, pullLow)
+if longCond
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if shortCond
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)
+plot(ema, color=color.new(color.orange, 0))

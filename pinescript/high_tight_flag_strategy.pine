@@ -1,0 +1,18 @@
+//@version=5
+strategy("High Tight Flag", overlay=true, pyramiding=0)
+poleBars = input.int(30, "Pole Bars")
+flagBars = input.int(15, "Flag Bars")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.5, "SL ATR Mult")
+rr = input.float(3.0, "RR")
+atr = ta.atr(atrLen)
+poleStart = open[poleBars + flagBars - 1]
+poleEnd = close[flagBars]
+poleGain = (poleEnd - poleStart) / poleStart
+flagHigh = ta.highest(high, flagBars)[1]
+flagLow = ta.lowest(low, flagBars)[1]
+validFlag = poleGain > 0.08 and flagLow > poleEnd * 0.9
+if validFlag and ta.crossover(close, flagHigh)
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+plot(flagHigh, color=color.new(color.green, 0))

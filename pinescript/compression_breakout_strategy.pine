@@ -1,0 +1,17 @@
+//@version=5
+strategy("Compression Breakout", overlay=true, pyramiding=0)
+len = input.int(12, "Compression Bars")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.2, "SL ATR Mult")
+rr = input.float(2.4, "RR")
+atr = ta.atr(atrLen)
+comp = ta.highest(high, len) - ta.lowest(low, len)
+compressed = comp < atr * 1.1
+hi = ta.highest(high, len)[1]
+lo = ta.lowest(low, len)[1]
+if compressed and ta.crossover(close, hi)
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if compressed and ta.crossunder(close, lo)
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)

@@ -1,0 +1,16 @@
+//@version=5
+strategy("Gap Open Breakout", overlay=true, pyramiding=0)
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.2, "SL ATR Mult")
+rr = input.float(2.5, "RR")
+atr = ta.atr(atrLen)
+gapUp = open > high[1] + atr * 0.35
+gapDown = open < low[1] - atr * 0.35
+longCond = gapUp and close > open and close > high[1]
+shortCond = gapDown and close < open and close < low[1]
+if longCond
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if shortCond
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)

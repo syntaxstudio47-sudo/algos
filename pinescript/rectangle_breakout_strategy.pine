@@ -1,0 +1,18 @@
+//@version=5
+strategy("Rectangle Breakout", overlay=true, pyramiding=0)
+len = input.int(30, "Range Length")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.3, "SL ATR Mult")
+rr = input.float(2.4, "RR")
+hi = ta.highest(high, len)[1]
+lo = ta.lowest(low, len)[1]
+atr = ta.atr(atrLen)
+rangeOk = (hi - lo) < atr * 2.5
+if rangeOk and ta.crossover(close, hi)
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if rangeOk and ta.crossunder(close, lo)
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)
+plot(hi, color=color.new(color.blue, 0))
+plot(lo, color=color.new(color.blue, 0))

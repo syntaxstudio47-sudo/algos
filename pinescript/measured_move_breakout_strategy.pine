@@ -1,0 +1,19 @@
+//@version=5
+strategy("Measured Move Breakout", overlay=true, pyramiding=0)
+impulseBars = input.int(18, "Impulse Bars")
+pullbackBars = input.int(10, "Pullback Bars")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.4, "SL ATR Mult")
+rr = input.float(2.8, "RR")
+atr = ta.atr(atrLen)
+startP = open[impulseBars + pullbackBars - 1]
+endP = close[pullbackBars]
+move = math.abs(endP - startP)
+ph = ta.highest(high, pullbackBars)[1]
+pl = ta.lowest(low, pullbackBars)[1]
+if endP > startP and move > atr * 2 and ta.crossover(close, ph)
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if endP < startP and move > atr * 2 and ta.crossunder(close, pl)
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)

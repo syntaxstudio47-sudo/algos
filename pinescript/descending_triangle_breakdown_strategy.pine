@@ -1,0 +1,16 @@
+//@version=5
+strategy("Descending Triangle Breakdown", overlay=true, pyramiding=0)
+len = input.int(40, "Lookback")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.4, "SL ATR Mult")
+rr = input.float(2.7, "RR")
+hi = ta.highest(high, len)[1]
+lo = ta.lowest(low, len)[1]
+atr = ta.atr(atrLen)
+flatSup = math.abs(ta.sma(low, len) - ta.lowest(low, len)) < atr * 0.3
+fallingHighs = ta.linreg(high, len, 0) < ta.linreg(high, len, 1)
+shortCond = flatSup and fallingHighs and ta.crossunder(close, lo)
+if shortCond
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)
+plot(lo, color=color.new(color.red, 0))

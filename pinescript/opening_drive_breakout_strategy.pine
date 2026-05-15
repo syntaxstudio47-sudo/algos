@@ -1,0 +1,24 @@
+//@version=5
+strategy("Opening Drive Breakout", overlay=true, pyramiding=0)
+openBars = input.int(6, "Opening Bars")
+atrLen = input.int(14, "ATR Length")
+atrMult = input.float(1.2, "SL ATR Mult")
+rr = input.float(2.4, "RR")
+atr = ta.atr(atrLen)
+var float odHigh = na
+var float odLow = na
+if ta.change(time("D"))
+    odHigh := na
+    odLow := na
+if na(odHigh)
+    odHigh := high
+    odLow := low
+if bar_index % 1000 < openBars
+    odHigh := math.max(odHigh, high)
+    odLow := math.min(odLow, low)
+if not na(odHigh) and ta.crossover(close, odHigh)
+    strategy.entry("L", strategy.long)
+    strategy.exit("LX", "L", stop=close-atr*atrMult, limit=close+atr*atrMult*rr)
+if not na(odLow) and ta.crossunder(close, odLow)
+    strategy.entry("S", strategy.short)
+    strategy.exit("SX", "S", stop=close+atr*atrMult, limit=close-atr*atrMult*rr)
