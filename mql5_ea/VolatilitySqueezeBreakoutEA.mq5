@@ -1,139 +1,24 @@
 #property strict
 #include <Trade/Trade.mqh>
-
 CTrade trade;
+input double Lots=0.10;
+input int BBPeriod=20;
+input double BBDev=2.0;
+input int ATRPeriod=14;
+input double SqueezeATRRatio=1.8;
+input double ATRSLMult=1.4;
+input double RR=2.6;
+input int MaxTradesPerDay=2;
+input ulong Magic=620012;
+datetime lastBar=0; int tradesToday=0, atrHandle, bbHandle;
 
-input double Lots = 0.10;
-input int BBPeriod = 20;
-input double BBDeviation = 2.0;
-input int KCPeriod = 20;
-input double KCMultiplier = 1.5;
-input int ATRPeriod = 14;
-input double ATR_SL_Mult = 1.5;
-input double RR_Multiple = 2.5;
-input int MaxTradesPerDay = 3;
-input ulong MagicNumber = 440006;
-
-datetime lastBarTime = 0;
-datetime lastSignalBar = 0;
-int tradesToday = 0;
-int lastTradeDay = -1;
-
-bool IsNewBar()
-{
-   datetime currentBar = iTime(_Symbol, PERIOD_CURRENT, 0);
-   if(currentBar != lastBarTime)
-   {
-      lastBarTime = currentBar;
-      return true;
-   }
-   return false;
-}
-
-void ResetDailyCounter()
-{
-   MqlDateTime tm;
-   TimeToStruct(TimeCurrent(), tm);
-   if(lastTradeDay != tm.day)
-   {
-      tradesToday = 0;
-      lastTradeDay = tm.day;
-   }
-}
-
-bool HasOpenPosition()
-{
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
-   {
-      ulong ticket = PositionGetTicket(i);
-      if(ticket > 0 && PositionSelectByTicket(ticket))
-      {
-         if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
-            (ulong)PositionGetInteger(POSITION_MAGIC) == MagicNumber)
-            return true;
-      }
-   }
-   return false;
-}
-
-double GetATR(int period)
-{
-   int handle = iATR(_Symbol, PERIOD_CURRENT, period);
-   if(handle == INVALID_HANDLE) return 0.0;
-   double atr[];
-   if(CopyBuffer(handle, 0, 1, 1, atr) <= 0) return 0.0;
-   return atr[0];
-}
-
-bool GetBands(double &bbUpper, double &bbLower, double &kcUpper, double &kcLower, double &close1)
-{
-   int bbHandle = iBands(_Symbol, PERIOD_CURRENT, BBPeriod, 0, BBDeviation, PRICE_CLOSE);
-   if(bbHandle == INVALID_HANDLE) return false;
-
-   double upperBuf[], lowerBuf[];
-   if(CopyBuffer(bbHandle, 1, 1, 1, upperBuf) <= 0) return false;
-   if(CopyBuffer(bbHandle, 2, 1, 1, lowerBuf) <= 0) return false;
-
-   double ema = iMA(_Symbol, PERIOD_CURRENT, KCPeriod, 0, MODE_EMA, PRICE_CLOSE, 1);
-   double atrKC = GetATR(KCPeriod);
-   if(ema == 0 || atrKC == 0) return false;
-
-   bbUpper = upperBuf[0];
-   bbLower = lowerBuf[0];
-   kcUpper = ema + atrKC * KCMultiplier;
-   kcLower = ema - atrKC * KCMultiplier;
-   close1 = iClose(_Symbol, PERIOD_CURRENT, 1);
-   return true;
-}
-
-void CheckForSignal()
-{
-   if(!IsNewBar()) return;
-   ResetDailyCounter();
-   if(tradesToday >= MaxTradesPerDay) return;
-   if(HasOpenPosition()) return;
-
-   datetime currentBar = iTime(_Symbol, PERIOD_CURRENT, 1);
-   if(lastSignalBar == currentBar) return;
-
-   double bbUpper, bbLower, kcUpper, kcLower, close1;
-   if(!GetBands(bbUpper, bbLower, kcUpper, kcLower, close1)) return;
-
-   double atr = GetATR(ATRPeriod);
-   if(atr <= 0) return;
-
-   bool squeezeReleased = (bbUpper > kcUpper || bbLower < kcLower);
-   bool buySignal = squeezeReleased && close1 > bbUpper;
-   bool sellSignal = squeezeReleased && close1 < bbLower;
-
-   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-
-   if(buySignal)
-   {
-      double sl = NormalizeDouble(ask - atr * ATR_SL_Mult, _Digits);
-      double tp = NormalizeDouble(ask + atr * ATR_SL_Mult * RR_Multiple, _Digits);
-      trade.SetExpertMagicNumber(MagicNumber);
-      if(trade.Buy(Lots, _Symbol, ask, sl, tp, "Squeeze Breakout BUY"))
-      {
-         tradesToday++;
-         lastSignalBar = currentBar;
-      }
-   }
-   else if(sellSignal)
-   {
-      double sl = NormalizeDouble(bid + atr * ATR_SL_Mult, _Digits);
-      double tp = NormalizeDouble(bid - atr * ATR_SL_Mult * RR_Multiple, _Digits);
-      trade.SetExpertMagicNumber(MagicNumber);
-      if(trade.Sell(Lots, _Symbol, bid, sl, tp, "Squeeze Breakout SELL"))
-      {
-         tradesToday++;
-         lastSignalBar = currentBar;
-      }
-   }
-}
-
-void OnTick()
-{
-   CheckForSignal();
-}
+bool NewBar(){ datetime t=iTime(_Symbol,_Period,0); if(t!=lastBar){ lastBar=t; return true;} return false; }
+void ResetDay(){ static int lastDay=-1; MqlDateTime dt; TimeToStruct(TimeCurrent(),dt); if(dt.day!=lastDay){ tradesToday=0; lastDay=dt.day; } }
+double ATR(){ double b[]; ArraySetAsSeries(b,true); if(CopyBuffer(atrHandle,0,0,2,b)<2) return 0; return b[0]; }
+bool BB(double &upper,double &lower){ double up[], lo[]; ArraySetAsSeries(up,true); ArraySetAsSeries(lo,true); if(CopyBuffer(bbHandle,1,0,2,up)<2) return false; if(CopyBuffer(bbHandle,2,0,2,lo)<2) return false; upper=up[1]; lower=lo[1]; return true; }
+bool HasPosition(){ for(int i=0;i<PositionsTotal();i++){ ulong ticket=PositionGetTicket(i); if(ticket>0 && PositionSelectByTicket(ticket)){ if((string)PositionGetString(POSITION_SYMBOL)==_Symbol && (ulong)PositionGetInteger(POSITION_MAGIC)==Magic) return true; }} return false; }
+void OnTick(){ if(!NewBar()) return; ResetDay(); if(tradesToday>=MaxTradesPerDay || HasPosition()) return; double atr=ATR(), upper, lower; if(atr<=0 || !BB(upper,lower)) return; if((upper-lower) > atr*SqueezeATRRatio) return; double h1=iHigh(_Symbol,_Period,1), l1=iLow(_Symbol,_Period,1), c1=iClose(_Symbol,_Period,1), c2=iClose(_Symbol,_Period,2); trade.SetExpertMagicNumber(Magic);
+ if(h1>upper && c2<=upper && c1>upper){ double ask=SymbolInfoDouble(_Symbol,SYMBOL_ASK); double sl=ask-atr*ATRSLMult; double tp=ask+atr*ATRSLMult*RR; if(trade.Buy(Lots,_Symbol,ask,sl,tp,"VolatilitySqueezeBuy")) tradesToday++; }
+ else if(l1<lower && c2>=lower && c1<lower){ double bid=SymbolInfoDouble(_Symbol,SYMBOL_BID); double sl=bid+atr*ATRSLMult; double tp=bid-atr*ATRSLMult*RR; if(trade.Sell(Lots,_Symbol,bid,sl,tp,"VolatilitySqueezeSell")) tradesToday++; } }
+int OnInit(){ atrHandle=iATR(_Symbol,_Period,ATRPeriod); bbHandle=iBands(_Symbol,_Period,BBPeriod,0,BBDev,PRICE_CLOSE); return (atrHandle==INVALID_HANDLE||bbHandle==INVALID_HANDLE)?INIT_FAILED:INIT_SUCCEEDED; }
+void OnDeinit(const int reason){ if(atrHandle!=INVALID_HANDLE) IndicatorRelease(atrHandle); if(bbHandle!=INVALID_HANDLE) IndicatorRelease(bbHandle); }
