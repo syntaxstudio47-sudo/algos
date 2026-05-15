@@ -1,0 +1,40 @@
+//@version=5
+strategy("Inside Bar Breakout Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+atrLength = input.int(14, "ATR Length", minval=1)
+atrSLMult = input.float(1.0, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(2.5, "Risk Reward Multiple", step=0.1)
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+motherHigh = high[2]
+motherLow = low[2]
+insideHigh = high[1]
+insideLow = low[1]
+
+isInsideBar = insideHigh < motherHigh and insideLow > motherLow
+atr = ta.atr(atrLength)
+
+longCondition = useLongs and isInsideBar and close > insideHigh and close[1] <= insideHigh
+shortCondition = useShorts and isInsideBar and close < insideLow and close[1] >= insideLow
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = math.min(insideLow, strategy.position_avg_price - atr * atrSLMult)
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = math.max(insideHigh, strategy.position_avg_price + atr * atrSLMult)
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plot(isInsideBar ? insideHigh : na, "Inside High", color=color.green, linewidth=2, style=plot.style_linebr)
+plot(isInsideBar ? insideLow : na, "Inside Low", color=color.red, linewidth=2, style=plot.style_linebr)

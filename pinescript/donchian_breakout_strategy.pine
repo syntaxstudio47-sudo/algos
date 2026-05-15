@@ -1,0 +1,39 @@
+//@version=5
+strategy("Donchian Breakout Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+donchianLength = input.int(20, "Donchian Length", minval=2)
+atrPeriod = input.int(14, "ATR Period", minval=1)
+atrSLMult = input.float(1.5, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(2.5, "Risk Reward Multiple", step=0.1)
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+upperBand = ta.highest(high, donchianLength)[1]
+lowerBand = ta.lowest(low, donchianLength)[1]
+midBand = (upperBand + lowerBand) / 2.0
+atr = ta.atr(atrPeriod)
+
+longCondition = useLongs and close > upperBand and close[1] <= upperBand
+shortCondition = useShorts and close < lowerBand and close[1] >= lowerBand
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = math.min(lowerBand, strategy.position_avg_price - atr * atrSLMult)
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = math.max(upperBand, strategy.position_avg_price + atr * atrSLMult)
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plot(upperBand, "Upper Donchian", color=color.green, linewidth=2)
+plot(midBand, "Mid Donchian", color=color.orange, linewidth=1)
+plot(lowerBand, "Lower Donchian", color=color.red, linewidth=2)
