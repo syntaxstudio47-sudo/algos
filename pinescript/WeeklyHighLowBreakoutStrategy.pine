@@ -1,0 +1,36 @@
+//@version=5
+strategy("Weekly High Low Breakout Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+atrPeriod = input.int(14, "ATR Period", minval=1)
+atrSLMult = input.float(1.5, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(3.0, "Risk Reward Multiple", step=0.1)
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+prevWeekHigh = request.security(syminfo.tickerid, "W", high[1], lookahead=barmerge.lookahead_on)
+prevWeekLow = request.security(syminfo.tickerid, "W", low[1], lookahead=barmerge.lookahead_on)
+atr = ta.atr(atrPeriod)
+
+longCondition = useLongs and close > prevWeekHigh and close[1] <= prevWeekHigh
+shortCondition = useShorts and close < prevWeekLow and close[1] >= prevWeekLow
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = strategy.position_avg_price - atr * atrSLMult
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = strategy.position_avg_price + atr * atrSLMult
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plot(prevWeekHigh, "Prev Week High", color=color.green, linewidth=2, style=plot.style_linebr)
+plot(prevWeekLow, "Prev Week Low", color=color.red, linewidth=2, style=plot.style_linebr)

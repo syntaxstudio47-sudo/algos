@@ -1,0 +1,42 @@
+//@version=5
+strategy("Turtle Breakout Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+entryLength = input.int(20, "Entry Length", minval=2)
+exitLength = input.int(10, "Exit Length", minval=2)
+atrPeriod = input.int(14, "ATR Period", minval=1)
+atrSLMult = input.float(2.0, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(2.5, "Risk Reward Multiple", step=0.1)
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+entryHigh = ta.highest(high, entryLength)[1]
+entryLow = ta.lowest(low, entryLength)[1]
+exitHigh = ta.highest(high, exitLength)[1]
+exitLow = ta.lowest(low, exitLength)[1]
+atr = ta.atr(atrPeriod)
+
+longCondition = useLongs and close > entryHigh and close[1] <= entryHigh
+shortCondition = useShorts and close < entryLow and close[1] >= entryLow
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = math.min(exitLow, strategy.position_avg_price - atr * atrSLMult)
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = math.max(exitHigh, strategy.position_avg_price + atr * atrSLMult)
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plot(entryHigh, "Entry High", color=color.green, linewidth=2)
+plot(entryLow, "Entry Low", color=color.red, linewidth=2)
+plot(exitHigh, "Exit High", color=color.new(color.green, 50), linewidth=1)
+plot(exitLow, "Exit Low", color=color.new(color.red, 50), linewidth=1)

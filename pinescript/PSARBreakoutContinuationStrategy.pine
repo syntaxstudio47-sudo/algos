@@ -1,0 +1,45 @@
+//@version=5
+strategy("PSAR Breakout Continuation Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+afStart = input.float(0.02, "PSAR AF Start", step=0.01)
+afStep = input.float(0.02, "PSAR AF Step", step=0.01)
+afMax = input.float(0.2, "PSAR AF Max", step=0.01)
+breakoutPeriod = input.int(14, "Breakout Period", minval=2)
+atrPeriod = input.int(14, "ATR Period", minval=1)
+atrSLMult = input.float(1.3, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(2.5, "Risk Reward Multiple", step=0.1)
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+sar = ta.sar(afStart, afStep, afMax)
+atr = ta.atr(atrPeriod)
+breakoutHigh = ta.highest(high, breakoutPeriod)[1]
+breakoutLow = ta.lowest(low, breakoutPeriod)[1]
+
+bullFlip = close > sar and close[1] <= sar[1]
+bearFlip = close < sar and close[1] >= sar[1]
+
+longCondition = useLongs and bullFlip and close > breakoutHigh
+shortCondition = useShorts and bearFlip and close < breakoutLow
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = math.min(sar, strategy.position_avg_price - atr * atrSLMult)
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = math.max(sar, strategy.position_avg_price + atr * atrSLMult)
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plot(sar, "PSAR", style=plot.style_circles, color=color.blue)
+plot(breakoutHigh, "Breakout High", color=color.new(color.green, 60), linewidth=1)
+plot(breakoutLow, "Breakout Low", color=color.new(color.red, 60), linewidth=1)

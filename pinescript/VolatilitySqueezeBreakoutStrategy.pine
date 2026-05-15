@@ -1,0 +1,50 @@
+//@version=5
+strategy("Volatility Squeeze Breakout Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+length = input.int(20, "Length", minval=1)
+bbMult = input.float(2.0, "BB Multiplier", step=0.1)
+kcMult = input.float(1.5, "KC Multiplier", step=0.1)
+atrPeriod = input.int(14, "ATR Period", minval=1)
+atrSLMult = input.float(1.5, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(2.5, "Risk Reward Multiple", step=0.1)
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+basis = ta.sma(close, length)
+dev = ta.stdev(close, length)
+bbUpper = basis + dev * bbMult
+bbLower = basis - dev * bbMult
+atrKC = ta.atr(length)
+kcUpper = basis + atrKC * kcMult
+kcLower = basis - atrKC * kcMult
+atr = ta.atr(atrPeriod)
+
+squeeze = bbUpper < kcUpper and bbLower > kcLower
+release = not squeeze and squeeze[1]
+momentum = close - ta.sma(close, length)
+
+longCondition = useLongs and release and close > bbUpper and momentum > 0
+shortCondition = useShorts and release and close < bbLower and momentum < 0
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = strategy.position_avg_price - atr * atrSLMult
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = strategy.position_avg_price + atr * atrSLMult
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plot(bbUpper, "BB Upper", color=color.green)
+plot(bbLower, "BB Lower", color=color.red)
+plot(kcUpper, "KC Upper", color=color.new(color.green, 60))
+plot(kcLower, "KC Lower", color=color.new(color.red, 60))

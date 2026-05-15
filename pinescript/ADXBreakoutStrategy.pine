@@ -1,0 +1,44 @@
+//@version=5
+strategy("ADX Breakout Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+adxPeriod = input.int(14, "ADX Period", minval=1)
+adxThreshold = input.float(25.0, "ADX Threshold", step=0.1)
+breakoutPeriod = input.int(14, "Breakout Period", minval=2)
+atrPeriod = input.int(14, "ATR Period", minval=1)
+atrSLMult = input.float(1.5, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(2.5, "Risk Reward Multiple", step=0.1)
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+adxValue = ta.adx(adxPeriod)
+plusDI = ta.plusdi(adxPeriod)
+minusDI = ta.minusdi(adxPeriod)
+atr = ta.atr(atrPeriod)
+
+breakoutHigh = ta.highest(high, breakoutPeriod)[1]
+breakoutLow = ta.lowest(low, breakoutPeriod)[1]
+
+longCondition = useLongs and adxValue >= adxThreshold and plusDI > minusDI and close > breakoutHigh and close[1] <= breakoutHigh
+shortCondition = useShorts and adxValue >= adxThreshold and minusDI > plusDI and close < breakoutLow and close[1] >= breakoutLow
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = strategy.position_avg_price - atr * atrSLMult
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = strategy.position_avg_price + atr * atrSLMult
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plot(breakoutHigh, "Breakout High", color=color.green, linewidth=2)
+plot(breakoutLow, "Breakout Low", color=color.red, linewidth=2)
+plot(adxValue, "ADX", color=color.orange, display=display.none)

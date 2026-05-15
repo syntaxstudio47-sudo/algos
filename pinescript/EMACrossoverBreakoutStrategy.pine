@@ -1,0 +1,53 @@
+//@version=5
+strategy("EMA Crossover Breakout Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+fastLength = input.int(9, "Fast EMA", minval=1)
+slowLength = input.int(21, "Slow EMA", minval=1)
+trendLength = input.int(50, "Trend EMA", minval=1)
+breakoutPeriod = input.int(14, "Breakout Period", minval=2)
+atrPeriod = input.int(14, "ATR Period", minval=1)
+atrSLMult = input.float(1.3, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(2.5, "Risk Reward Multiple", step=0.1)
+requireTrendFilter = input.bool(true, "Require Trend Filter")
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+emaFast = ta.ema(close, fastLength)
+emaSlow = ta.ema(close, slowLength)
+emaTrend = ta.ema(close, trendLength)
+atr = ta.atr(atrPeriod)
+
+breakoutHigh = ta.highest(high, breakoutPeriod)[1]
+breakoutLow = ta.lowest(low, breakoutPeriod)[1]
+
+bullCross = emaFast[1] <= emaSlow[1] and emaFast > emaSlow
+bearCross = emaFast[1] >= emaSlow[1] and emaFast < emaSlow
+trendBull = not requireTrendFilter or close > emaTrend
+trendBear = not requireTrendFilter or close < emaTrend
+
+longCondition = useLongs and bullCross and close > breakoutHigh and trendBull
+shortCondition = useShorts and bearCross and close < breakoutLow and trendBear
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = strategy.position_avg_price - atr * atrSLMult
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = strategy.position_avg_price + atr * atrSLMult
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plot(emaFast, "Fast EMA", color=color.green)
+plot(emaSlow, "Slow EMA", color=color.orange)
+plot(emaTrend, "Trend EMA", color=color.blue)
+plot(breakoutHigh, "Breakout High", color=color.new(color.green, 60), linewidth=1)
+plot(breakoutLow, "Breakout Low", color=color.new(color.red, 60), linewidth=1)

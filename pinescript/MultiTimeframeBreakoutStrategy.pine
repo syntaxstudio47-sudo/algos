@@ -1,0 +1,46 @@
+//@version=5
+strategy("Multi-Timeframe Breakout Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+htf = input.timeframe("60", "Higher Timeframe")
+htfEmaLength = input.int(50, "HTF EMA Length", minval=1)
+breakoutPeriod = input.int(20, "Breakout Period", minval=2)
+atrPeriod = input.int(14, "ATR Period", minval=1)
+atrSLMult = input.float(1.5, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(2.5, "Risk Reward Multiple", step=0.1)
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+htfClose = request.security(syminfo.tickerid, htf, close, lookahead=barmerge.lookahead_on)
+htfEma = request.security(syminfo.tickerid, htf, ta.ema(close, htfEmaLength), lookahead=barmerge.lookahead_on)
+atr = ta.atr(atrPeriod)
+
+breakoutHigh = ta.highest(high, breakoutPeriod)[1]
+breakoutLow = ta.lowest(low, breakoutPeriod)[1]
+
+trendBull = htfClose > htfEma
+trendBear = htfClose < htfEma
+
+longCondition = useLongs and trendBull and close > breakoutHigh and close[1] <= breakoutHigh
+shortCondition = useShorts and trendBear and close < breakoutLow and close[1] >= breakoutLow
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = strategy.position_avg_price - atr * atrSLMult
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = strategy.position_avg_price + atr * atrSLMult
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plot(htfEma, "HTF EMA Proxy", color=color.blue)
+plot(breakoutHigh, "Breakout High", color=color.green)
+plot(breakoutLow, "Breakout Low", color=color.red)

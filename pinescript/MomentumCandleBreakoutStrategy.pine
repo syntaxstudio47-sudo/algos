@@ -1,0 +1,40 @@
+//@version=5
+strategy("Momentum Candle Breakout Strategy", overlay=true, initial_capital=100000, pyramiding=0)
+
+atrPeriod = input.int(14, "ATR Period", minval=1)
+minBodyATRMult = input.float(1.2, "Min Body ATR Multiple", step=0.1)
+atrSLMult = input.float(1.2, "ATR SL Multiplier", step=0.1)
+rrMultiple = input.float(2.5, "Risk Reward Multiple", step=0.1)
+useLongs = input.bool(true, "Enable Longs")
+useShorts = input.bool(true, "Enable Shorts")
+
+atr = ta.atr(atrPeriod)
+body = math.abs(close[1] - open[1])
+bodyATRRatio = atr > 0 ? body / atr : 0.0
+bullMomentum = close[1] > open[1] and bodyATRRatio >= minBodyATRMult
+bearMomentum = close[1] < open[1] and bodyATRRatio >= minBodyATRMult
+
+longCondition = useLongs and bullMomentum
+shortCondition = useShorts and bearMomentum
+
+if (longCondition and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+if (strategy.position_size > 0)
+    longStop = strategy.position_avg_price - atr * atrSLMult
+    longRisk = strategy.position_avg_price - longStop
+    longTarget = strategy.position_avg_price + longRisk * rrMultiple
+    strategy.exit("Long Exit", from_entry="Long", stop=longStop, limit=longTarget)
+
+if (strategy.position_size < 0)
+    shortStop = strategy.position_avg_price + atr * atrSLMult
+    shortRisk = shortStop - strategy.position_avg_price
+    shortTarget = strategy.position_avg_price - shortRisk * rrMultiple
+    strategy.exit("Short Exit", from_entry="Short", stop=shortStop, limit=shortTarget)
+
+plotshape(bullMomentum, title="Bull Momentum", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny)
+plotshape(bearMomentum, title="Bear Momentum", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
+plot(bodyATRRatio, "Body/ATR Ratio", color=color.orange, display=display.none)
