@@ -1,0 +1,71 @@
+//@version=5
+strategy(title="Supertrend Trailing Strategy", shorttitle="ST_TRAIL", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.05, slippage=2, max_bars_back=500)
+st_atr_period = input.int(10, "ST ATR Period", minval=1, group="Supertrend")
+st_factor = input.float(3.0, "ST Factor", minval=0.1, group="Supertrend", step=0.1)
+use_ema_filter = input.bool(true, "Use EMA Trend Filter", group="EMA Filter")
+ema_period = input.int(200, "EMA Period", minval=1, group="EMA Filter")
+atr_period_risk = input.int(14, "ATR Period (Risk)", minval=1, group="Risk Management")
+atr_sl_mult = input.float(1.5, "ATR SL Multiplier", minval=0.1, group="Risk Management", step=0.1)
+atr_tp_mult = input.float(3.0, "ATR TP Multiplier", minval=0.1, group="Risk Management", step=0.1)
+use_fixed_tp = input.bool(false, "Use Fixed TP (else trail to ST)", group="Risk Management")
+use_session = input.bool(false, "Filter by Session", group="Session Filter")
+session_start = input.session("0915-1530", "Trading Session (IST)", group="Session Filter")
+alert_on_entry = input.bool(true, "Alert on Entry", group="Alerts")
+alert_on_exit = input.bool(true, "Alert on Exit", group="Alerts")
+[st_line, st_direction] = ta.supertrend(st_factor, st_atr_period)
+is_bullish = st_direction == -1
+is_bearish = st_direction == 1
+st_flip_up = st_direction == -1 and st_direction[1] == 1
+st_flip_down = st_direction == 1 and st_direction[1] == -1
+ema_val = ta.ema(close, ema_period)
+above_ema = close > ema_val
+below_ema = close < ema_val
+atr_risk = ta.atr(atr_period_risk)
+in_session = use_session ? not na(time(timeframe.period, session_start, "Asia/Kolkata")) : true
+long_filter = use_ema_filter ? above_ema : true
+short_filter = use_ema_filter ? below_ema : true
+long_entry = st_flip_up and long_filter and in_session
+short_entry = st_flip_down and short_filter and in_session
+var float entry_price_long = na
+var float entry_price_short = na
+if long_entry
+    entry_price_long := close
+if short_entry
+    entry_price_short := close
+long_sl = entry_price_long - atr_risk * atr_sl_mult
+long_tp = entry_price_long + atr_risk * atr_tp_mult
+short_sl = entry_price_short + atr_risk * atr_sl_mult
+short_tp = entry_price_short - atr_risk * atr_tp_mult
+if long_entry
+    strategy.entry("Long", strategy.long, comment="ST_LONG")
+    if use_fixed_tp
+        strategy.exit("Long_Exit", "Long", stop=long_sl, limit=long_tp, comment="LONG_EXIT")
+if short_entry
+    strategy.entry("Short", strategy.short, comment="ST_SHORT")
+    if use_fixed_tp
+        strategy.exit("Short_Exit", "Short", stop=short_sl, limit=short_tp, comment="SHORT_EXIT")
+if not use_fixed_tp
+    if strategy.position_size > 0 and st_flip_down
+        strategy.close("Long", comment="ST_TRAIL_EXIT_LONG")
+    if strategy.position_size < 0 and st_flip_up
+        strategy.close("Short", comment="ST_TRAIL_EXIT_SHORT")
+st_color = is_bullish ? color.new(#00c853, 0) : color.new(#ff1744, 0)
+plot(st_line, "Supertrend", color=st_color, linewidth=2)
+plot(use_ema_filter ? ema_val : na, "EMA", color=color.new(color.orange, 20), linewidth=1)
+plotshape(long_entry, "BUY Signal", shape.labelup, location.belowbar, color.new(#00c853, 0), text="BUY", textcolor=color.white, size=size.small)
+plotshape(short_entry, "SELL Signal", shape.labeldown, location.abovebar, color.new(#ff1744, 0), text="SELL", textcolor=color.white, size=size.small)
+bgcolor(strategy.position_size > 0 ? color.new(#00c853, 92) : strategy.position_size < 0 ? color.new(#ff1744, 92) : na, title="Position Background")
+plot(strategy.position_size > 0 ? long_sl : na, "Long SL", color=color.new(color.red, 30), linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size > 0 ? long_tp : na, "Long TP", color=color.new(color.green, 30), linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size < 0 ? short_sl : na, "Short SL", color=color.new(color.red, 30), linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size < 0 ? short_tp : na, "Short TP", color=color.new(color.green, 30), linewidth=1, style=plot.style_linebr)
+if alert_on_entry
+    if long_entry
+        alert("ST LONG Entry | " + syminfo.ticker + " | Price: " + str.tostring(close), alert.freq_once_per_bar_close)
+    if short_entry
+        alert("ST SHORT Entry | " + syminfo.ticker + " | Price: " + str.tostring(close), alert.freq_once_per_bar_close)
+if alert_on_exit
+    if strategy.position_size > 0 and st_flip_down
+        alert("ST LONG Exit (Trail) | " + syminfo.ticker + " | Price: " + str.tostring(close), alert.freq_once_per_bar_close)
+    if strategy.position_size < 0 and st_flip_up
+        alert("ST SHORT Exit (Trail) | " + syminfo.ticker + " | Price: " + str.tostring(close), alert.freq_once_per_bar_close)

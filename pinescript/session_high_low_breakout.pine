@@ -1,0 +1,92 @@
+//@version=5
+strategy(title="Session High/Low Breakout — London & NY", shorttitle="SESSION_BREAKOUT", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.05, slippage=2, max_bars_back=1000)
+asian_start = input.string("0000-0600", "Asian Session (UTC)", group="Sessions (UTC)")
+london_session = input.string("0700-1200", "London Session (UTC)", group="Sessions (UTC)")
+ny_session = input.string("1300-1700", "NY Session (UTC)", group="Sessions (UTC)")
+min_range_pips = input.float(5.0, "Min Asian Range (pips)", minval=1.0, group="Breakout Settings")
+breakout_buffer = input.float(1.0, "Breakout Buffer (pips)", minval=0.0, group="Breakout Settings")
+require_close = input.bool(true, "Require Candle Close Beyond Range", group="Breakout Settings")
+trade_london = input.bool(true, "Trade London Breakout", group="Trade Sessions")
+trade_ny = input.bool(true, "Trade NY Breakout", group="Trade Sessions")
+trade_direction = input.string("Both", "Trade Direction", options=["Both", "Long Only", "Short Only"], group="Trade Sessions")
+atr_period = input.int(14, "ATR Period", minval=1, group="Risk")
+atr_sl_mult = input.float(1.5, "ATR SL Multiplier", minval=0.1, group="Risk", step=0.1)
+atr_tp_mult = input.float(3.0, "ATR TP Multiplier", minval=0.1, group="Risk", step=0.1)
+use_range_sl = input.bool(true, "SL at Opposite Range", group="Risk")
+show_asian_box = input.bool(true, "Show Asian Range Box", group="Visuals")
+show_levels = input.bool(true, "Show Breakout Levels", group="Visuals")
+box_color = input.color(color.new(#ffd600, 85), "Asian Box Color", group="Visuals")
+enable_alerts = input.bool(true, "Enable Alerts", group="Alerts")
+in_asian = not na(time(timeframe.period, asian_start, "UTC"))
+in_london = not na(time(timeframe.period, london_session, "UTC"))
+in_ny = not na(time(timeframe.period, ny_session, "UTC"))
+in_breakout_window = (trade_london and in_london) or (trade_ny and in_ny)
+asian_just_ended = not in_asian and in_asian[1]
+london_just_opened = in_london and not in_london[1]
+ny_just_opened = in_ny and not in_ny[1]
+var float asian_high = na
+var float asian_low = na
+var float asian_high_f = na
+var float asian_low_f = na
+if in_asian
+    asian_high := na(asian_high) ? high : math.max(asian_high, high)
+    asian_low := na(asian_low) ? low : math.min(asian_low, low)
+if asian_just_ended
+    asian_high_f := asian_high
+    asian_low_f := asian_low
+    asian_high := na
+    asian_low := na
+pip = syminfo.mintick * (syminfo.digits == 5 or syminfo.digits == 3 ? 10 : 1)
+range_pips = na(asian_high_f) or na(asian_low_f) ? 0.0 : (asian_high_f - asian_low_f) / pip
+range_valid = range_pips >= min_range_pips
+buf_price = breakout_buffer * pip
+breakout_long = na(asian_high_f) ? na : asian_high_f + buf_price
+breakout_short = na(asian_low_f) ? na : asian_low_f - buf_price
+atr_val = ta.atr(atr_period)
+var bool traded_this_session = false
+if london_just_opened or ny_just_opened
+    traded_this_session := false
+long_breakout = in_breakout_window and range_valid and not traded_this_session and not na(breakout_long) and (require_close ? close > breakout_long : high > breakout_long) and (trade_direction == "Both" or trade_direction == "Long Only")
+short_breakout = in_breakout_window and range_valid and not traded_this_session and not na(breakout_short) and (require_close ? close < breakout_short : low < breakout_short) and (trade_direction == "Both" or trade_direction == "Short Only")
+long_sl = use_range_sl ? asian_low_f - buf_price : close - atr_val * atr_sl_mult
+long_tp = close + atr_val * atr_tp_mult
+short_sl = use_range_sl ? asian_high_f + buf_price : close + atr_val * atr_sl_mult
+short_tp = close - atr_val * atr_tp_mult
+if long_breakout and strategy.position_size == 0
+    strategy.entry("Long", strategy.long, comment="SESSION_LONG")
+    strategy.exit("Long_Exit", "Long", stop=long_sl, limit=long_tp, comment="LONG_EXIT")
+    traded_this_session := true
+if short_breakout and strategy.position_size == 0
+    strategy.entry("Short", strategy.short, comment="SESSION_SHORT")
+    strategy.exit("Short_Exit", "Short", stop=short_sl, limit=short_tp, comment="SHORT_EXIT")
+    traded_this_session := true
+var box asian_box = na
+var line level_high_ln = na
+var line level_low_ln = na
+if in_asian and show_asian_box
+    if na(asian_box)
+        asian_box := box.new(bar_index, asian_high, bar_index, asian_low, border_color=color.new(#ffd600, 40), bgcolor=box_color, border_width=1)
+    else
+        box.set_right(asian_box, bar_index)
+        box.set_top(asian_box, asian_high)
+        box.set_bottom(asian_box, asian_low)
+if asian_just_ended and show_levels
+    line.delete(level_high_ln)
+    line.delete(level_low_ln)
+    level_high_ln := line.new(bar_index, asian_high_f, bar_index + 100, asian_high_f, color=color.new(#00e676, 70), style=line.style_dashed, width=1)
+    level_low_ln := line.new(bar_index, asian_low_f, bar_index + 100, asian_low_f, color=color.new(#ff1744, 70), style=line.style_dashed, width=1)
+plotshape(long_breakout, "LONG Breakout", shape.triangleup, location.belowbar, color.new(#00e676, 0), text="BREAK↑", textcolor=color.white, size=size.small)
+plotshape(short_breakout, "SHORT Breakout", shape.triangledown, location.abovebar, color.new(#ff1744, 0), text="BREAK↓", textcolor=color.white, size=size.small)
+bgcolor(in_asian ? color.new(#ffd600, 93) : na, title="Asian Session")
+bgcolor(in_london ? color.new(#1565c0, 93) : na, title="London Session")
+bgcolor(in_ny ? color.new(#6a1b9a, 93) : na, title="NY Session")
+plot(strategy.position_size > 0 ? long_sl : na, "Long SL", color.new(color.red, 30), 1, plot.style_linebr)
+plot(strategy.position_size > 0 ? long_tp : na, "Long TP", color.new(color.green, 30), 1, plot.style_linebr)
+plot(strategy.position_size < 0 ? short_sl : na, "Short SL", color.new(color.red, 30), 1, plot.style_linebr)
+plot(strategy.position_size < 0 ? short_tp : na, "Short TP", color.new(color.green, 30), 1, plot.style_linebr)
+session_name = in_london ? "London" : "NY"
+if enable_alerts
+    if long_breakout
+        alert("SESSION LONG | " + syminfo.ticker + " | " + session_name + " Breakout", alert.freq_once_per_bar_close)
+    if short_breakout
+        alert("SESSION SHORT | " + syminfo.ticker + " | " + session_name + " Breakout", alert.freq_once_per_bar_close)
